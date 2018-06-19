@@ -1,0 +1,216 @@
+---
+title: "Vignette for package cfdr"
+author: "James Liley"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Vignette overview
+
+An important problem in high-dimensional association testing is the use of one dataset to assist association testing with another. A useful way to do this is the conditional false-discovery rate (cFDR), an analogue of the Benjamini-Hochberg procedure for two-dimensional data.
+
+This package contains code to compute several different estimators of cFDRs, and enables a hypothesis testing procedure which controls the overall false-discovery rate (FDR) at a given threshold. 
+
+This vignette demonstrates the analysis of a standard dataset. We assume that we are aiming to test the association of $n$ variables against some dependent variable $Y_P$ of interest. Suppose we do standard univariate hypothesis tests to obtain p-values $(p_{1},p_{2},...,p_{n})$ for each of these variables against the phenotype. Also suppose that we test the association of the same $n$ variables with some other dependent variable $Y_Q$, to get p-values $(q_1,q_2,...,q_n)$. We may suspect that association with both $Y_P$ and $Y_Q$ tends to be more common than random. 
+
+<!-- For want of an example, suppose that we have $n$ Peruvian football fans and we want to know which of them make a difference to the team's performance when attending games. We can get limited data for each fan by looking at how the Peruvian team does when that fan is present at a match, and analyse this to get p-values $(p_{1},p_{2},...,p_{n})$ against the null hypothesis $H^p=0$ (makes no difference to the Peruvian's team performance). Suppose, however, that (for some reason) our $n$ fans also support Qatar ($P,Q$ ...) and we also have data about whether each fan makes a difference to Qatari performance. We analyse this data to get p-values $(q_1,q_2,...,q_n)$ against the null hypothesis 'fan makes no difference to Qatari performance'. A fan who helps Qatar along is probably also going to be helpful for Peru; so we might want to use the values $q_i$ to help analyse the values $p_i$ against $H^p=0$, and then win the world cup. -->
+
+<!-- We consider the values $(p_{1},q_1),(p_{2},q_2),...,(p_{n},q_n)$ to be samples from a bivariate random variable $(P,Q)$. We denote the null hypothesis event (variable is not associated with $Y^P$) by $H^P=0$. The cFDR is a function of two variables $(p,q)$ defined as the probability $Pr(H^p=0|P \leq p,Q \leq q)$. -->
+
+In this vignette, we will firstly use the values $(p_{1},q_1),(p_{2},q_2),...,(p_{n},q_n)$ to perform a hypothesis test for each of the $n$ variables/fans for association with the dependent variables of interest which is more powerful than using the values $(p_{1},p_{2},...,p_{n})$ alone. We will control the FDR of our discovery procedure at $\alpha=0.1$. We will also examine the estimation of the conditional false discovery rate for each $p_i,q_i$.
+
+
+## Simulate data and establish general properties
+
+<!-- We simulate datasets which have $n=10000$ variables overall, of which $n_1^p = 100$ are associated only with $Y_P$, $n_1^q=100$ with $Y_Q$, $n_1^{pq}=100$ with both $Y_P$ and $Y_Q$, and $n-n_1^p - n_1^q-n_1^{pq}=99700$ with neither $Y_P$ nor $Y_Q$. We simulate associations such that observed z-scores for these variables have distribution $N(0,2^2)$ (as opposed to $N(0,1)$ for non-associated variables). -->
+
+We simulate datasets which have $10000$ variables overall, of which $100$ are associated only with $Y_P$, $100$ with $Y_Q$, $100$ with both $Y_P$ and $Y_Q$ (make a difference to both), and $99700$ with neither $Y_P$ nor $Y_Q$. We simulate associations such that observed z-scores for these variables have a normal distribution with mean 0 and standard deviation 3 (as opposed to a standard deviation 1 for non-associated variables).
+
+```
+set.seed(1)                                           # ensure reproducibility
+n=10000; n1p=100; n1pq=100; n1q=100                   # parameters
+zp=c(rnorm(n1p,sd=3), rnorm(n1q,sd=1),
+     rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))    # simulate z-scores corresponding to p
+zq=c(rnorm(n1p,sd=1), rnorm(n1q,sd=3), 
+     rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))    # simulate z-scores corresponding to q
+p=2*pnorm(-abs(zp)); q=2*pnorm(-abs(zq))              # convert to p-values
+```
+
+We also split the variables into three folds, which we will use later:
+
+```
+fold_id=(1:n) %% 3
+```
+
+We are not going to reject $H^P=0$ for variables with very large p-values against $H^P=0$, so to save time we consider a set of indices of candidate variables rather than all of them.
+
+```
+candidate_indices=which(p<0.01 | q< 0.001)
+```
+
+
+and designate a set of indices of variables/fans we will use as examples:
+
+```
+example_indices=c(164,23,74)
+```
+
+The FDR-controlling procedure requires an estimate of the distribution of $Q|H^p=0$ (effectiveness in Qatari performance given no effect on Peruvian performance). We suggest modelling this as a bivariate Gaussian fitted to the values $q_i$ for which the corresponding $p_i$ is $\geq 1/2$. Fitted parameters (maximum-likelihood estimates) can be fitted using the function ```fit.2g```. In this simulated example, we also keep track of the true distribution of $Q|H^p=0$ under which $P,Q$ were simulated. <!-- (the true distribution of $Q|H^p=0$ is $2\Phi(-|N(0,1)|)$ with weight $1- n_1^q /(n-n_1^p- n_1^{pq}$), and $2\Phi(-|N(0,2^2)|)$ with weight $n_1^q /(n-n_1^p- n_1^{pq}$) -->
+
+```
+# True parameters
+true_q0_pars=c(1- n1q/(n-n1p-n1pq),2)
+
+# Estimated parameters:
+est_q0_pars=fit.2g(q[which(p>0.5)])$pars
+```
+
+## Hypothesis testing procedure: leave-one-out (method 4)
+
+
+### Compute L-curves passing through data points
+
+In order to control the overall FDR at $\alpha$, we construct 'L-curves' through the points $(p_i,q_i)$. L-curves are effectively contours of the cFDR estimator function. In order to control FDR, the shape of the L-curve through each point $(p_i,q_i)$ must be determined as if the specific point $(p_i,q_i)$ was not in the dataset. One way to do this is to leave out the individual point, compute the contours of the function, and then work out the contour which would go through that point. To do this, we use the function ```vl``` with the parameter ```mode``` set to 1. We only compute co-ordinates of L-curves at the candidate indices from above.
+
+```
+lx=vl(p,q,indices=candidate_indices,mode=1); 
+```
+
+To demonstrate what the curves look like, we show some examples:
+
+```
+vx=vl(p,q,indices=example_indices,mode=1); 
+plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="Single point removed"); 
+for (i in 1:length(example_indices)) lines(vx$x[i,],vx$y); 
+for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices [i]],pch=16,col="blue")
+```
+
+
+### Integrate over L-curves
+
+We now integrate the estimated distribution of $P,Q|H^p=0$ over the computed L-regions from the step above, to get an analogue of p-values ```v_est``` (for variables with indices not in ```candidate_indices```, we set ```v_est=1```). We also integrate over the true and estimated distributions estimated above to indicate the similarity between the two, although obviously in practice the true distribution is not known.
+
+```
+v_true=rep(1,n); v_est=v_true
+v_true[candidate_indices]=il(lx,pi0_null=true_q0_pars[1],sigma_null=true_q0_pars[2],distx="norm")
+v_est[candidate_indices]=il(lx,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
+```
+
+### Rejection procedure
+
+Finally, we run the Benjamini-Hochberg procedure on the values ```v_est```, to control the FDR at 0.1
+
+```
+hit=bh(v_est,alpha=0.1)
+```
+
+For comparison, we also evaluate the performance of the raw p-values:
+
+```
+hit_p=bh(p,alpha=0.1)
+```
+
+'True' associations are those with indices in $(1,100) \cup (201,300)$, so the proportions of false discoveries are
+
+```
+# cFDR
+1- (length(intersect(hit_est,c(1:100,201:300)))/length(hit_est)) 
+
+# P-value
+1- (length(intersect(hit_p,c(1:100,201:300)))/length(hit_p))
+```
+
+## Hypothesis testing procedure: fold removal (method 3)
+
+In some circumstances, some sets of $p_i$ are correlated with each other even when none of them are associated with $Y_P$. One such example is in genome-wide association studies, where statistics for variants on the same chromosome are correlated due to linkage disequilibrium. In this case, leaving out one point $(p_i,q_i)$ at a time is insufficient, since the point still affects the curves L through the points it is correlated with.
+
+This can be alleviated by using an alternative method for control of FDR, with a slight sacrifice of power. We split the data points into folds as above (variable ```fold_id```) and separately fit L curves for the points in each fold using the data in the other two folds. If datapoints are correlated, folds should be chosen to ensure that between-fold observations are independent.
+
+### Compute L-curves passing through data points
+
+We compute L-curves using function ```vl``` with ```mode=2```:
+
+```
+fold1=which(fold_id==1) 
+fold2=which(fold_id==2) 
+fold3=which(fold_id==3)
+
+ind1=intersect(candidate_indices,fold1) 
+ind2=intersect(candidate_indices,fold2) 
+ind3=intersect(candidate_indices,fold3) 
+
+v1=vl(p,q,indices=ind1,mode=2,fold=fold1);  # parameter fold specifies indices to leave out 
+v2=vl(p,q,indices=ind2,mode=2,fold=fold2); 
+v2=vl(p,q,indices=ind2,mode=2,fold=fold3); 
+```
+
+### Integrate over L-curves
+
+We integrate over L-curves as before, to get ```v_fold```
+
+```
+v_fold=rep(1,n)
+v_fold[ind1]=il(v1,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
+v_fold[ind2]=il(v2,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
+v_fold[ind3]=il(v3,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
+```
+
+### Rejection procedure
+
+Using the usual rejection procedure, we then determine which hypotheses to reject:
+
+```
+hit_fold=bh(v_fold,0.1)
+```
+
+## Other estimators for cFDR
+
+As seen in the figure above, L-curves generated using the usual cFDR estimator tend to be very discontinuous and rather unnatural. This is because the usual cFDR estimator relies on counting points, which induces large jump discontinuities in the cFDR function across the unit square. 
+
+More stable estimators, with more stable L-curves, are implemented in the functions ```vlx``` and ```vly```. The function ```vlx``` relies on a four-Gaussian mixture distribution for the overall distribution of $P,Q$, parameters of which can be obtained using the function ```fit.4g```:
+
+```
+fit_pars=fit.4g(cbind(zp,zq))$pars 
+```
+
+These can then be used for a continuous and predictably-behaved estimator of cFDR, with more simple L-curves:
+
+```
+v=vlx(p,q,pars=fit_pars,indices=example_indices); 
+plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="All points in"); 
+for (i in 1:length(example_indices)) lines(v$x[i,],v$y); 
+for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
+```
+
+We can also derive an estimator of cFDR using kernel density estimates, leading to a continuous cFDR estimator with somewhat less predictable behaviour than that of the Gaussian-model based estimator above.
+
+```
+v1=vly(p,q,indices=example_indices,mode=0); 
+plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="All points in"); 
+for (i in 1:length(example_indices)) lines(v1$x[i,],v1$y); 
+for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
+```
+
+Both of the above estimators can also be used in hypothesis testing; however, they are slightly less powerful than the standard estimator.
+
+Individual cFDR values can be computed using the functions ```cfdr``` (usual cFDR estimator), ```cfdrx``` (parametrisation-based cFDR estimator) and ```cfdry``` (kernel-density based cFDR estimator):
+
+```
+sub=which(-log10(p) + -log10(q) > 3)
+c1=cfdr(p,q,sub=sub)
+c2=cfdrx(p,q,sub=sub,pars=fit_pars)
+c3=cfdry(p,q,sub=sub)
+```
+
+The order in which hypotheses are rejected with increasing $\alpha$ may not be monotonic with estimated cFDR, as estimations differ when points are excluded, and the rejection procedure uses a version of the cFDR function with forced monotonicity with increasing $p$
