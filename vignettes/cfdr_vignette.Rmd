@@ -60,10 +60,10 @@ candidate_indices=which(p<0.01 | q< 0.001)
 ```
 
 
-and designate a set of indices of variables/fans we will use as examples:
+and designate a set of indices of variables we will use as examples:
 
 ```
-example_indices=c(164,23,74)
+example_indices=example_indices=c(4262, 268,83,8203) 
 ```
 
 The FDR-controlling procedure requires an estimate of the distribution of $Q|H^p=0$ (effectiveness in Qatari performance given no effect on Peruvian performance). We suggest modelling this as a bivariate Gaussian fitted to the values $q_i$ for which the corresponding $p_i$ is $\geq 1/2$. Fitted parameters (maximum-likelihood estimates) can be fitted using the function ```fit.2g```. In this simulated example, we also keep track of the true distribution of $Q|H^p=0$ under which $P,Q$ were simulated. <!-- (the true distribution of $Q|H^p=0$ is $2\Phi(-|N(0,1)|)$ with weight $1- n_1^q /(n-n_1^p- n_1^{pq}$), and $2\Phi(-|N(0,2^2)|)$ with weight $n_1^q /(n-n_1^p- n_1^{pq}$) -->
