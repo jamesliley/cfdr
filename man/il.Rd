@@ -5,7 +5,7 @@
 \title{il}
 \usage{
 il(X, Y = NULL, pi0_null = NULL, sigma_null = rep(1, length(pi0_null)),
-  rho_null = 0, distx = c("norm", "t", "cauchy"), ...)
+  rho_null = 0, distx = "norm", ...)
 }
 \arguments{
 \item{X}{either output from functions vl, vlx, or vly, or matrix nk x nc of x-co-ordinates (Z-plane) of regions to integrate over. X[k,] is the set of co-ordinates for the kth region.}
@@ -18,7 +18,7 @@ il(X, Y = NULL, pi0_null = NULL, sigma_null = rep(1, length(pi0_null)),
 
 \item{rho_null}{optional parameter governing covariance between Z scores under the null; for instance, from shared controls}
 
-\item{distx}{distribution type for distribution of Q|H^p=0. Should be a text string which can be appended to 'd' to get PDF and 'p' to get CDF}
+\item{distx}{distribution type for distribution of Q|H^p=0. Can be 1,2,or 3 (symbolising normal, t (3df) and Cauchy respectively) or a text string which can be appended to 'd' to get PDF and 'p' to get CDF}
 
 \item{...}{additional parameters passed to CDF and PDF functions, ie df=3}
 }
