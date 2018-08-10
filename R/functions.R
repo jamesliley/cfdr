@@ -98,14 +98,15 @@ vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_
   
   #gx=0 #1/1000  # use for 'tiebreaks'- if a point is on a curve with nonzero area, force the L-curve through that point
   
-  yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(indices)),yval2); pval2=2*pnorm(-yval2)
-  xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
-  
   if (is.null(indices)) {
     if (is.null(at)) stop("One of the parameters 'indices', 'at' must be set")
     ccut=at
     mode=0
-  }
+  } else ccut=rep(0,length(indices))
+  
+  yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
+  xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
+
   
   if (!is.null(indices)) { # set ccut. NOT equal to cfdr at the points; needs to be adjusted since an additional test point is used in determination of L
     if (mode==1) {
@@ -505,9 +506,6 @@ vlxl=function(p,q,pars,indices=NULL,at=NULL,p_threshold=0,nt=5000, nv=1000,scale
   
   if (!is.null(indices)) {
     ccut=raw_cfx(p[indices],q[indices])
-    #ccut=rep(1,length(indices))
-    #for (i in 1:length(indices))
-    #  ccut[i]= min(raw_cfx(seq(p[indices[i]],1,length.out=1000),q[indices[i]]))# set ccut
   }
   
   out=rep(0,length(ccut))
@@ -599,7 +597,11 @@ vly=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,p_threshold=0,nt=50
   
   zp=-qnorm(p/2); zq=-qnorm(q/2)
   
-  if (is.null(indices)) mode=0
+  if (is.null(indices)) {
+    mode=0
+    ccut=at
+  }
+  
   if (mode==2) sub=setdiff(1:length(zp),fold) else sub=1:length(zp)
   
   zp[which(zp > mx)]=mx
@@ -615,8 +617,7 @@ vly=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,p_threshold=0,nt=50
   cgrid=kgrid; cgrid$z=int_p/kgrid$z; cgrid$z=apply(cgrid$z,2,cummin)
   
   
-  if (!is.null(indices)) 
-    ccut= interp.surface(cgrid,cbind(pmin(zp[indices],mx),pmin(zq[indices],my)))
+  if (!is.null(indices)) ccut= interp.surface(cgrid,cbind(pmin(zp[indices],mx),pmin(zq[indices],my))) 
   out=rep(0,length(ccut))
   
   yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
