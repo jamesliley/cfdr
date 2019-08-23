@@ -24,16 +24,10 @@ This package contains code to compute several different estimators of cFDRs, and
 
 This vignette demonstrates the analysis of a standard dataset. We assume that we are aiming to test the association of $n$ variables against some dependent variable $Y_P$ of interest. Suppose we do standard univariate hypothesis tests to obtain p-values $(p_{1},p_{2},...,p_{n})$ for each of these variables against the phenotype. Also suppose that we test the association of the same $n$ variables with some other dependent variable $Y_Q$, to get p-values $(q_1,q_2,...,q_n)$. We may suspect that association with both $Y_P$ and $Y_Q$ tends to be more common than random. 
 
-<!-- For want of an example, suppose that we have $n$ Peruvian football fans and we want to know which of them make a difference to the team's performance when attending games. We can get limited data for each fan by looking at how the Peruvian team does when that fan is present at a match, and analyse this to get p-values $(p_{1},p_{2},...,p_{n})$ against the null hypothesis $H^p=0$ (makes no difference to the Peruvian's team performance). Suppose, however, that (for some reason) our $n$ fans also support Qatar ($P,Q$ ...) and we also have data about whether each fan makes a difference to Qatari performance. We analyse this data to get p-values $(q_1,q_2,...,q_n)$ against the null hypothesis 'fan makes no difference to Qatari performance'. A fan who helps Qatar along is probably also going to be helpful for Peru; so we might want to use the values $q_i$ to help analyse the values $p_i$ against $H^p=0$, and then win the world cup. -->
-
-<!-- We consider the values $(p_{1},q_1),(p_{2},q_2),...,(p_{n},q_n)$ to be samples from a bivariate random variable $(P,Q)$. We denote the null hypothesis event (variable is not associated with $Y^P$) by $H^P=0$. The cFDR is a function of two variables $(p,q)$ defined as the probability $Pr(H^p=0|P \leq p,Q \leq q)$. -->
-
 In this vignette, we will firstly use the values $(p_{1},q_1),(p_{2},q_2),...,(p_{n},q_n)$ to perform a hypothesis test for each of the $n$ variables/fans for association with the dependent variables of interest which is more powerful than using the values $(p_{1},p_{2},...,p_{n})$ alone. We will control the FDR of our discovery procedure at $\alpha=0.1$. We will also examine the estimation of the conditional false discovery rate for each $p_i,q_i$.
 
 
 ## Simulate data and establish general properties
-
-<!-- We simulate datasets which have $n=10000$ variables overall, of which $n_1^p = 100$ are associated only with $Y_P$, $n_1^q=100$ with $Y_Q$, $n_1^{pq}=100$ with both $Y_P$ and $Y_Q$, and $n-n_1^p - n_1^q-n_1^{pq}=99700$ with neither $Y_P$ nor $Y_Q$. We simulate associations such that observed z-scores for these variables have distribution $N(0,2^2)$ (as opposed to $N(0,1)$ for non-associated variables). -->
 
 We simulate datasets which have $10000$ variables overall, of which $100$ are associated only with $Y_P$, $100$ with $Y_Q$, $100$ with both $Y_P$ and $Y_Q$ (make a difference to both), and $99700$ with neither $Y_P$ nor $Y_Q$. We simulate associations such that observed z-scores for these variables have a normal distribution with mean 0 and standard deviation 3 (as opposed to a standard deviation 1 for non-associated variables).
 
@@ -76,7 +70,7 @@ true_q0_pars=c(1- n1q/(n-n1p-n1pq),2)
 est_q0_pars=fit.2g(q[which(p>0.5)])$pars
 ```
 
-## Hypothesis testing procedure: leave-one-out (method 4)
+## Hypothesis testing procedure: leave-one-out
 
 
 ### Compute L-curves passing through data points
@@ -131,11 +125,11 @@ hit_p=bh(p,alpha=0.1)
 1- (length(intersect(hit_p,c(1:100,201:300)))/length(hit_p))
 ```
 
-## Hypothesis testing procedure: fold removal (method 3)
+## Hypothesis testing procedure: fold removal
 
 In some circumstances, some sets of $p_i$ are correlated with each other even when none of them are associated with $Y_P$. One such example is in genome-wide association studies, where statistics for variants on the same chromosome are correlated due to linkage disequilibrium. In this case, leaving out one point $(p_i,q_i)$ at a time is insufficient, since the point still affects the curves L through the points it is correlated with.
 
-This can be alleviated by using an alternative method for control of FDR, with a slight sacrifice of power. We split the data points into folds as above (variable ```fold_id```) and separately fit L curves for the points in each fold using the data in the other two folds. If datapoints are correlated, folds should be chosen to ensure that between-fold observations are independent.
+This can be alleviated by using an alternative method for control of FDR. We split the data points into folds as above (variable ```fold_id```) and separately fit L curves for the points in each fold using the data in the other two folds. If datapoints are correlated, folds should be chosen to ensure that between-fold observations are independent.
 
 ### Compute L-curves passing through data points
 
@@ -173,44 +167,3 @@ Using the usual rejection procedure, we then determine which hypotheses to rejec
 ```
 hit_fold=bh(v_fold,0.1)
 ```
-
-## Other estimators for cFDR
-
-As seen in the figure above, L-curves generated using the usual cFDR estimator tend to be very discontinuous and rather unnatural. This is because the usual cFDR estimator relies on counting points, which induces large jump discontinuities in the cFDR function across the unit square. 
-
-More stable estimators, with more stable L-curves, are implemented in the functions ```vlx``` and ```vly```. The function ```vlx``` relies on a four-Gaussian mixture distribution for the overall distribution of $P,Q$, parameters of which can be obtained using the function ```fit.4g```:
-
-```
-fit_pars=fit.4g(cbind(zp,zq))$pars 
-```
-
-These can then be used for a continuous and predictably-behaved estimator of cFDR, with more simple L-curves:
-
-```
-v=vlx(p,q,pars=fit_pars,indices=example_indices); 
-plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="All points in"); 
-for (i in 1:length(example_indices)) lines(v$x[i,],v$y); 
-for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
-```
-
-We can also derive an estimator of cFDR using kernel density estimates, leading to a continuous cFDR estimator with somewhat less predictable behaviour than that of the Gaussian-model based estimator above.
-
-```
-v1=vly(p,q,indices=example_indices,mode=0); 
-plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="All points in"); 
-for (i in 1:length(example_indices)) lines(v1$x[i,],v1$y); 
-for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
-```
-
-Both of the above estimators can also be used in hypothesis testing; however, they are slightly less powerful than the standard estimator.
-
-Individual cFDR values can be computed using the functions ```cfdr``` (usual cFDR estimator), ```cfdrx``` (parametrisation-based cFDR estimator) and ```cfdry``` (kernel-density based cFDR estimator):
-
-```
-sub=which(-log10(p) + -log10(q) > 3)
-c1=cfdr(p,q,sub=sub)
-c2=cfdrx(p,q,sub=sub,pars=fit_pars)
-c3=cfdry(p,q,sub=sub)
-```
-
-The order in which hypotheses are rejected with increasing $\alpha$ may not be monotonic with estimated cFDR, as estimations differ when points are excluded, and the rejection procedure uses a version of the cFDR function with forced monotonicity with increasing $p$
