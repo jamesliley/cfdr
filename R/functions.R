@@ -81,7 +81,7 @@
 ##' for (i in 1:length(example_indices)) lines(v3$x[i,],v3$y); 
 ##' for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices [i]],pch=16,col="blue")
 ##'
-vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_threshold=0, scale=c("p","z"), closed=T,verbose=F,gx=10^-5) {
+vl=function(p,q,adj=TRUE,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_threshold=0, scale=c("p","z"), closed=TRUE,verbose=FALSE,gx=10^-5) {
   
   # internal interpolation function
   ff=function(xtest,xx,cxi) {
@@ -106,7 +106,7 @@ vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_
   
   yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
   xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
-
+  
   
   if (!is.null(indices)) { # set ccut. NOT equal to cfdr at the points; needs to be adjusted since an additional test point is used in determination of L
     if (mode==1) {
@@ -160,7 +160,7 @@ vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_
     
     if (adj) {
       correct=cummin((1+ecdf(q[which(p>0.5)])(pval2)*length(p))/
-                       (1+ ecdf(q)(pval2)*length(p)))
+          (1+ ecdf(q)(pval2)*length(p)))
       if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
     } else {
       correct=rep(1,length(pval2)) # adjustment factor for pc[i]
@@ -233,7 +233,7 @@ vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_
     
     if (adj) {
       correct=cummin((1+ecdf(q[-fold][which(p[-fold]>0.5)])(pval2)*length(p[-fold]))/
-                       (1+ ecdf(q[-fold])(pval2)*length(p[-fold])))
+          (1+ ecdf(q[-fold])(pval2)*length(p[-fold])))
       if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
     } else {
       correct=rep(1,length(pval2)) # adjustment factor for pc[i]
@@ -273,6 +273,101 @@ vl=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,nt=5000, nv=1000, p_
 }
 
 
+
+
+
+
+
+
+
+##' Return co-ordinates of L-regions using 'oracle' method in which PDFs of ZP,ZQ|HP0 and ZP,ZQ
+##' are known
+##' 
+##' 
+##' @title vlo
+##' @param p principal p-values
+##' @param q conditional p-values
+##' @param f0 PDF of ZP,ZQ|HP0. Function of two variables. Can also be CDF if oracle cFDR is wanted instead of cfdr.
+##' @param f PDF of ZP,ZQ. Function of two variables. Can also be CDF if oracle cFDR is wanted instead of cfdr.
+##' @param indices instead of at cfdr cutoffs, compute v(L) at indices of points. Overrides parameter at if set.
+##' @param at cfdr cutoff/cutoffs. Defaults to null
+##' @param nt number of test points in x-direction, default 5000
+##' @param nv resolution for constructing L-curves, default 1000
+##' @param scale return curves on the p- or z- plane. Y values are equally spaced on the z-plane.
+##' @param closed determines whether curves are closed polygons encircling regions L (closed=T), or lines indicating the rightmost border of regions L
+##' @export
+##' @author James Liley
+##' @return list containing elements x, y. Assuming n curves are calculated (where n=length(indices) or length(at)) and closed=T, x is a matrix of dimension n x (4+nv), y ix a vector of length (4+nv).
+##' @examples 
+##' # Generate standardised simulated dataset
+##' set.seed(1); n=10000; n1p=100; n1pq=100; n1q=100
+##' zp=c(rnorm(n1p,sd=3), rnorm(n1q,sd=1),rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))
+##' zq=c(rnorm(n1p,sd=1), rnorm(n1q,sd=3),rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))
+##' p=2*pnorm(-abs(zp)); q=2*pnorm(-abs(zq))
+##' fold_id=(1:n) %% 3
+##' 
+##' 
+##' # points to generate L-regions for
+##' example_indices=c(4262, 268,83,8203)
+##' 
+##' 
+##' v1=vlo(p,q,f0,f,indices=example_indices); 
+##' plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="Oracle rejection regions"); 
+##' for (i in 1:length(example_indices)) lines(v1$x[i,],v1$y); 
+##' for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],qh=16,col="blue")
+##'
+vlo=function(p,q,f0,f,indices=NULL,at=NULL,nt=5000, nv=1000, scale=c("p","z"), closed=T) {
+  #vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000, nv=1000,scale=c("p","z"),closed=T) {
+  
+  zp=-qnorm(p/2); zq=-qnorm(q/2)
+  
+  if (any(!is.finite(zp+zq))) stop("P-values p,q must be in [1e-300,1]")
+  
+  #nt=5000; # number of test point in x direction
+  #nv=1000; # resolution
+  mx=max(c(10,abs(-qnorm(p/2)))); my=max(c(10,abs(-qnorm(q/2)))); #mx=10; my=10 # maximum limits for integration
+  
+  
+  if (is.null(indices)) {
+    if (is.null(at)) stop("One of the parameters 'indices', 'at' must be set")
+    ccut=at
+    mode=0
+  }
+  
+  raw_cfx=function(p,q) f0(-qnorm(p/2),-qnorm(q/2))/f(-qnorm(p/2),-qnorm(q/2))
+  
+  if (!is.null(indices)) {
+    ccut=raw_cfx(p[indices],q[indices])
+  }
+  
+  out=rep(0,length(ccut))
+  
+  yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
+  xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
+  
+  for (i in 1:length(yval2)) {
+    cfx=cummin(raw_cfx(ptest,2*pnorm(-yval2[i])))
+    xval2[,i]=approx(cfx,xtest,ccut,rule=2,method="const",f=1)$y
+  }
+  
+  
+  if (closed) {
+    yval2=c(Inf,0,yval2,Inf,Inf)
+    xval2=cbind(Inf,Inf,xval2,xval2[,nv],Inf)
+  }
+  
+  if (scale[1]=="p") {
+    X=2*pnorm(-abs(xval2))
+    Y=2*pnorm(-abs(yval2))
+  } else {
+    X=xval2
+    Y=yval2
+  }
+  
+  return(list(x=X,y=Y))  
+  
+  
+}
 
 
 
@@ -365,7 +460,7 @@ vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000
   denom=function(zp,zq,pars) denom1(zp,zq,pars)/denom2(zp,zq,pars)
   adjx=function(zp,zq,pars) (pars[1]/(pars[1]+pars[3]))*pnorm(-zq) +
     (pars[3]/(pars[1]+pars[3]))*pnorm(-zq,sd=pars[6])
-  if (adj==2) {
+  if (adj) {
     raw_cfx=function(p,q) p*adjx(-qnorm(p/2),-qnorm(q/2),pars)/denom1(-qnorm(p/2),-qnorm(q/2),pars)
   } else {
     raw_cfx=function(p,q) p/denom(-qnorm(p/2),-qnorm(q/2),pars)
@@ -386,20 +481,20 @@ vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000
   yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
   xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
   
-  if (adj==1) {
-    include=setdiff(1:length(p),fold)
-    correct=cummin((1+ecdf(q[include][which(p[include]>0.5)])(pval2)*length(p[include]))/
-                     (1+ ecdf(q[include])(pval2)*length(p[include])))
-    if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
-  } else {
-    correct=rep(1,length(pval2)) # adjustment factor for pc[i]
-    correct_ccut=rep(1,length(ccut))
-  }
-  if (!is.null(indices)) ccut=ccut*correct_ccut
+#  if (adj==1) {
+#    include=setdiff(1:length(p),fold)
+#    correct=cummin((1+ecdf(q[include][which(p[include]>0.5)])(pval2)*length(p[include]))/
+#        (1+ ecdf(q[include])(pval2)*length(p[include])))
+#    if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
+#  } else {
+#    correct=rep(1,length(pval2)) # adjustment factor for pc[i]
+#    correct_ccut=rep(1,length(ccut))
+#  }
+#  if (!is.null(indices)) ccut=ccut*correct_ccut
   
   for (i in 1:length(yval2)) {
     cfx=cummin(raw_cfx(ptest,2*pnorm(-yval2[i])))
-    xval2[,i]=approx(cfx*correct[i],xtest,ccut,rule=2,method="const",f=1)$y
+    xval2[,i]=approx(cfx,xtest,ccut,rule=2,method="const",f=1)$y
   }
   
   
@@ -626,7 +721,7 @@ vly=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,p_threshold=0,nt=50
   if (adj) {
     include=setdiff(1:length(p),fold)
     correct=cummin((1+ecdf(q[include][which(p[include]>0.5)])(pval2)*length(p[include]))/
-                     (1+ ecdf(q[include])(pval2)*length(p[include])))
+        (1+ ecdf(q[include])(pval2)*length(p[include])))
     if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
   } else {
     correct=rep(1,length(pval2)) # adjustment factor for q[i]
@@ -643,6 +738,139 @@ vly=function(p,q,adj=T,indices=NULL,at=NULL,mode=0,fold=NULL,p_threshold=0,nt=50
       xval2[,i]=approx(cfx,xtest,ccut/correct[i],rule=2,method="const",f=1)$y
       #} else xval2[,i]=-qnorm(ccut/2)    
     } else if (i>1) xval2[,i]=xval2[,i-1] else xval2[,i]=-qnorm(ccut/2)    
+  }
+  
+  xval2[which(xval2> -qnorm(p_threshold/2))]=-qnorm(p_threshold/2)
+  if (closed) {
+    yval2=c(Inf,0,yval2,Inf,Inf)
+    xval2=cbind(Inf,Inf,xval2,xval2[,nv],Inf)
+  }
+  
+  if (scale[1]=="p") {
+    X=2*pnorm(-abs(xval2))
+    Y=2*pnorm(-abs(yval2))
+  } else {
+    X=xval2
+    Y=yval2
+  }
+  
+  return(list(x=X,y=Y))  
+  
+}
+
+
+
+
+
+##' Return co-ordinates of L-regions for local cFDR using KDEs. Automatically includes an estimate of 
+##' Pr(H0|Q<q).
+##'
+##' Estimates empirical distribution of (P,Q) by fitting a kernel density estimate to observed values.
+##'
+##' @title vlyl
+##' @param p principal p-values
+##' @param q conditional p-values
+##' @param adj adjust cFDR values and hence curves L using estimate of Pr(H0|Pj<pj)
+##' @param indices compute v(L) at indices of points. Overrides parameter at if set.
+##' @param at cfdr cutoff/cutoffs. Defaults to null
+##' @param mode set to 0 to leave all of 'indices' in, 1 (NOT CURRENTLY SUPPORTED) to remove each index only when computing L at that point, 2 to remove all of 'indices' from p,q
+##' @param fold If mode=2, only compute L-curves using points not in 'fold'. 
+##' @param p_threshold if H0 is to be rejected automatically whenever p<p_threshold, include this in all regions L
+##' @param nt number of test points in x-direction, default 5000
+##' @param nv resolution for constructing L-curves, default 1000
+##' @param scale return curves on the p- or z- plane. Y values are equally spaced on the z-plane.
+##' @param closed determines whether curves are closed polygons encircling regions L (closed=T), or lines indicating the rightmost border of regions L
+##' @param ... other parameters passed to function kde2d. Can be used to set a non-Gaussian kernel.
+##' @author James Liley
+##' @export
+##' @return list containing elements x, y. Assuming n curves are calculated and closed=T (where n=length(indices) or length(at)), x is a matrix of dimension n x (4+nv), y ix a vector of length (4+nv).
+##' @examples 
+##' # Generate standardised simulated dataset
+##' set.seed(1); n=10000; n1p=100; n1pq=100; n1q=100
+##' zp=c(rnorm(n1p,sd=3), rnorm(n1q,sd=1),rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))
+##' zq=c(rnorm(n1p,sd=1), rnorm(n1q,sd=3),rnorm(n1pq,sd=3), rnorm(n-n1p-n1q-n1pq,sd=1))
+##' p=2*pnorm(-abs(zp)); q=2*pnorm(-abs(zq))
+##' fold_id=(1:n) %% 3
+##' 
+##' # estimate parameters of underying dataset
+##' fit_pars=fit.4g(cbind(zp,zq))$pars
+##' 
+##' # estimate parameters of underying dataset, removing fold 1
+##' fit_pars_fold23=fit.4g(cbind(zp[which(fold_id!=1)],zq[which(fold_id!=1)]))$pars
+##' 
+##' 
+##' # points to generate L-regions for
+##' example_indices=c(4262, 268,83,8203)
+##' 
+##' par(mfrow=c(1,2))
+##' 
+##' v=vlx(p,q,pars=fit_pars,indices=example_indices); 
+##' plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="All points in"); 
+##' for (i in 1:length(example_indices)) lines(v$x[i,],v$y); 
+##' for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
+##' 
+##' v2=vlx(p,q,pars=fit_pars_fold23,indices=example_indices); 
+##' plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="Fold removed"); 
+##' for (i in 1:length(example_indices)) lines(v2$x[i,],v2$y); 
+##' for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
+##'
+##' 
+vlyl=function(p,q,indices=NULL,at=NULL,mode=0,fold=NULL,p_threshold=0,nt=5000,nv=1000,scale=c("p","z"),closed=T,bw=1,...) {
+  
+  res=200
+  
+  if (mode==1) stop("Leave-one-out method is not directly supported in this function, but can be implemented for individual indices i using mode=2, indices=i, and fold=(1:length(p))[-i]")
+  
+  mx=max(c(10,abs(-qnorm(p/2)))); my=max(c(10,abs(-qnorm(q/2)))); 
+  # mx=10; my=10 # maximum limits for integration
+  
+  zp=-qnorm(p/2); zq=-qnorm(q/2)
+  
+  if (is.null(indices)) {
+    mode=0
+    ccut=at
+  }
+  
+  if (mode==2) sub=setdiff(1:length(zp),fold) else sub=1:length(zp)
+  
+  zp[which(zp > mx)]=mx
+  zq[which(zq > my)]=my
+  
+  w=which(is.finite(zp[sub]+zq[sub])); rr=max(c(12,mx,my)) 
+  lims=c(0,rr,0,rr)
+  
+  px=dnorm(seq(lims[1],lims[2],length.out=res)) # Expected normal kernel density  
+  
+  kpq=kde2d(c(zp[sub],zp[sub],-zp[sub],-zp[sub]),c(zq[sub],-zq[sub],-zq[sub],zq[sub]),n=res,lims=lims,h=c(1,1),...) # Kernel density of P,Q
+  #  kpq$z=pmax(kpq$z,outer(px,px)) # minimum value is normal density; needed for regularisation
+  kpq$z=apply(kpq$z,2,function(x) rev(cummax(rev(x))))
+  
+  zqs=zq[sub][which(p[sub]>0.5)]
+  kq=density(c(zqs,-zqs),from=lims[1],to=lims[2],n=res) # Kernel density of Q|HP0 (marginal)
+  
+  kpq0=kpq
+  kpq0$z=outer(px,kq$y); kpq0$z=kpq0$z*(sum(kpq$z)/sum(kpq0$z))#  kpq0=outer(px,pmax(kq$y,px)) # Kernel density of P,Q|HP0
+  kpq$z[which(kpq$z==0)]=min(kpq$z[which(kpq$z>0)])
+  kpq0$z[which(kpq0$z==0)]=min(kpq0$z[which(kpq0$z>0)])
+  
+  cgrid=kpq; 
+  cgrid$z=pmin(kpq0$z/kpq$z,10)
+  
+  # cgrid$z=apply(cgrid$z,2,function(x) rev(cummax(rev(x-rev(cummin(rev(x)))))))
+  cgrid$z=apply(cgrid$z,2,function(x) cummin(x-rev(cummin(rev(x)))))
+  
+  #	rev(cummax(rev(x))))
+  
+  if (!is.null(indices)) ccut= interp.surface(cgrid,cbind(pmin(zp[indices],mx),pmin(zq[indices],my)))*1.01 
+  out=rep(0,length(ccut))
+  
+  yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
+  xtest=seq(0,my,length.out=nt); ptest=2*pnorm(-xtest)
+  
+  for (i in 1:length(yval2)) {
+    xdenom=interp.surface(cgrid,cbind(xtest,rep(yval2[i],length(xtest))))
+    cfx=xdenom
+    xval2[,i]=approx(c(cfx,1.005*max(cfx)),c(xtest,0),ccut,rule=2,method="const",f=1)$y
   }
   
   xval2[which(xval2> -qnorm(p_threshold/2))]=-qnorm(p_threshold/2)
@@ -763,9 +991,9 @@ il=function(X,Y=NULL,pi0_null=NULL,sigma_null=rep(1,length(pi0_null)),rho_null=0
       }
       
       ypart= ysc*colSums(4*pnorm(-t(X))*(pi0_null[ii]*dnorm(Y) + 
-                                           (1-pi0_null[ii])*pdf(Y/sigma_null[ii],...)/sigma_null[ii])) 
+          (1-pi0_null[ii])*pdf(Y/sigma_null[ii],...)/sigma_null[ii])) 
       infpart=  4*pnorm(-X[,yw])*(pi0_null[ii]*pnorm(-Y[yw]) + 
-                                    (1-pi0_null[ii])*cdf(-Y[yw]/sigma_null[ii],...))
+          (1-pi0_null[ii])*cdf(-Y[yw]/sigma_null[ii],...))
       out=cbind(out,ypart+infpart)
     }
   } else {
@@ -786,11 +1014,11 @@ il=function(X,Y=NULL,pi0_null=NULL,sigma_null=rep(1,length(pi0_null)),rho_null=0
       m1a=rho_null[ii]*Y; m1b=rho_null[ii]*Y/(sigma_null[ii]^2) # means of conditional distributions given y=Y
       s1a=sqrt(1-(rho_null[ii]^2)); s1b=sqrt(1-(rho_null[ii]/sigma_null[ii])^2)
       ypart1=ysc* colSums(2*(pnorm(-t(X),mean=m1a,sd=s1a)*pi0_null[ii]*dnorm(Y) +
-                               pnorm(-t(X),mean=m1b,sd=s1b)*(1-pi0_null[ii])*
-                               pdf(Y/sigma_null[ii],...)/sigma_null[ii])) # positive rho part
+          pnorm(-t(X),mean=m1b,sd=s1b)*(1-pi0_null[ii])*
+          pdf(Y/sigma_null[ii],...)/sigma_null[ii])) # positive rho part
       ypart2=ysc* colSums(2*(pnorm(-t(X),mean=-m1a,sd=s1a)*pi0_null[ii]*dnorm(Y) +
-                               pnorm(-t(X),mean=-m1b,sd=s1b)*(1-pi0_null[ii])*
-                               pdf(Y/sigma_null[ii],...)/sigma_null[ii])) # negative rho part
+          pnorm(-t(X),mean=-m1b,sd=s1b)*(1-pi0_null[ii])*
+          pdf(Y/sigma_null[ii],...)/sigma_null[ii])) # negative rho part
       infpart1=2*pi0_null[ii]*pbivnorm(-X[,yw],-Y[yw],rho=rho_null[ii]) +    
         2*(1-pi0_null[ii])*pbivnorm(-X[,yw],-Y[yw]/sigma_null[ii],rho=rho_null[ii]/sigma_null[ii])
       infpart2=2*pi0_null[ii]*pbivnorm(-X[,yw],-Y[yw],rho=-rho_null[ii]) +    
@@ -829,7 +1057,7 @@ il=function(X,Y=NULL,pi0_null=NULL,sigma_null=rep(1,length(pi0_null)),rho_null=0
 ##' fit=fit.2g(Z)
 ##' fit$pars
 fit.2g=function(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z),dim(Z)[1])), 
-                sigma_range = c(1,100),rho=0,...) {
+  sigma_range = c(1,100),rho=0,...) {
   if (all(P<=1) & all(P>= 0)) Z=-qnorm(P/2) else Z=P # P-values or Z scores
   
   pars = as.numeric(pars)
@@ -845,7 +1073,7 @@ fit.2g=function(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z),dim(Z)[1])
     weights = weights[w]
     w1=which(abs(Z)<30); w2=setdiff(1:length(Z),w1)
     l2 = function(pars = c(0.5, 1.5)) -(sum(weights[w1] * log(pars[1] * 
-                                                                dnorm(Z[w1], sd = 1) + (1 - pars[1]) * dnorm(Z[w1], sd = pars[2])))) +
+        dnorm(Z[w1], sd = 1) + (1 - pars[1]) * dnorm(Z[w1], sd = pars[2])))) +
       -(sum(weights[w2] * (log(1 - pars[1]) + dnorm(Z[w2], sd = pars[2],log=T)))) 
   } else {
     w1=which(abs(Z[,2])<30); w2=setdiff(1:dim(Z)[1],w1)
@@ -866,12 +1094,12 @@ fit.2g=function(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z),dim(Z)[1])
     }
   }
   zx = optim(pars, function(p) l2(p), lower = c(1e-05, sigma_range[1]), 
-             upper = c(1 - (1e-05), sigma_range[2]), method = "L-BFGS-B", control = list(factr = 10), 
-             ...)
+    upper = c(1 - (1e-05), sigma_range[2]), method = "L-BFGS-B", control = list(factr = 10), 
+    ...)
   h1 = -zx$value
   h0 = -l2()
   yy = list(pars = zx$par, h1value = h1, h0value = h0, lr = h1 - 
-              h0)
+      h0)
   return(yy)
 }
 
@@ -914,9 +1142,7 @@ fit.2g=function(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z),dim(Z)[1])
 ##' 
 ##' f=fit.4g(Z)
 ##' f$pars
-fit.4g= function (P, pars = c(0.7, 0.1,0.1, 2, 2, 2, 2), weights = rep(1, 
-                                                                       dim(Z)[1]), C = 1, maxit = 10000, tol = 1e-04, 
-                  sgm = c(1,100)) {
+fit.4g= function (P, pars = c(0.7, 0.1,0.1, 2, 2, 2, 2), weights = rep(1,dim(Z)[1]), C = 1, maxit = 10000, tol = 1e-04,sgm = c(1,100)) {
   
   if (all(P<=1) & all(P>= 0)) Z=-qnorm(P/2) else Z=P # P-values or Z scores
   

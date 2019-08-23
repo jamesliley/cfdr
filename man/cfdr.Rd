@@ -4,8 +4,8 @@
 \alias{cfdr}
 \title{cfdr}
 \usage{
-cfdr(p, q, sub = which(qnorm(p/2)^2 + qnorm(q/2)^2 > 4), exclude = NULL,
-  adj = F)
+cfdr(p, q, sub = which(qnorm(p/2)^2 + qnorm(q/2)^2 > 4),
+  exclude = NULL, adj = F)
 }
 \arguments{
 \item{p}{vector of p-values for dependent variable of interest}

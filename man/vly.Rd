@@ -4,9 +4,9 @@
 \alias{vly}
 \title{vly}
 \usage{
-vly(p, q, adj = T, indices = NULL, at = NULL, mode = 0, fold = NULL,
-  p_threshold = 0, nt = 5000, nv = 1000, scale = c("p", "z"),
-  closed = T, ...)
+vly(p, q, adj = T, indices = NULL, at = NULL, mode = 0,
+  fold = NULL, p_threshold = 0, nt = 5000, nv = 1000,
+  scale = c("p", "z"), closed = T, ...)
 }
 \arguments{
 \item{p}{principal p-values}

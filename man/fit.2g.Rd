@@ -4,8 +4,8 @@
 \alias{fit.2g}
 \title{fit.2g}
 \usage{
-fit.2g(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z), dim(Z)[1])),
-  sigma_range = c(1, 100), rho = 0, ...)
+fit.2g(P, pars = c(0.5, 1.5), weights = rep(1, min(length(Z),
+  dim(Z)[1])), sigma_range = c(1, 100), rho = 0, ...)
 }
 \arguments{
 \item{P}{numeric vector of observed data, either p-values or z-scores. If rho=0, should be one-dimensional vector; if rho is set, should be bivariate observations (P,Q)}

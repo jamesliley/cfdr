@@ -4,8 +4,8 @@
 \alias{fit.4g}
 \title{fit.4g}
 \usage{
-fit.4g(P, pars = c(0.7, 0.1, 0.1, 2, 2, 2, 2), weights = rep(1, dim(Z)[1]),
-  C = 1, maxit = 10000, tol = 1e-04, sgm = c(1, 100))
+fit.4g(P, pars = c(0.7, 0.1, 0.1, 2, 2, 2, 2), weights = rep(1,
+  dim(Z)[1]), C = 1, maxit = 10000, tol = 1e-04, sgm = c(1, 100))
 }
 \arguments{
 \item{P}{matrix N x 2 of data points (Z scores or P-values)}

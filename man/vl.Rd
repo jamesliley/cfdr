@@ -4,9 +4,9 @@
 \alias{vl}
 \title{vl}
 \usage{
-vl(p, q, adj = T, indices = NULL, at = NULL, mode = 0, fold = NULL,
-  nt = 5000, nv = 1000, p_threshold = 0, scale = c("p", "z"),
-  closed = T, verbose = F, gx = 10^-5)
+vl(p, q, adj = TRUE, indices = NULL, at = NULL, mode = 0,
+  fold = NULL, nt = 5000, nv = 1000, p_threshold = 0,
+  scale = c("p", "z"), closed = TRUE, verbose = FALSE, gx = 10^-5)
 }
 \arguments{
 \item{p}{principal p-values}

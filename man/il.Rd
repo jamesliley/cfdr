@@ -4,8 +4,8 @@
 \alias{il}
 \title{il}
 \usage{
-il(X, Y = NULL, pi0_null = NULL, sigma_null = rep(1, length(pi0_null)),
-  rho_null = 0, distx = "norm", ...)
+il(X, Y = NULL, pi0_null = NULL, sigma_null = rep(1,
+  length(pi0_null)), rho_null = 0, distx = "norm", ...)
 }
 \arguments{
 \item{X}{either output from functions vl, vlx, or vly, or matrix nk x nc of x-co-ordinates (Z-plane) of regions to integrate over. X[k,] is the set of co-ordinates for the kth region.}
