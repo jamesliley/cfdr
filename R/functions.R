@@ -1,11 +1,15 @@
 ###########################################################################
 ##                                                                       ##
-## Assess improvements to false-discovery rate control in cFDR method    ##
-## Functions for simulation                                              ##
+## Accurate error control in high dimensional association testing using  ##
+##  conditional false discovery rates                                    ##
 ##                                                                       ##
-## James Liley, 15/2/18                                                  ##
+## Functions: reproduction of cfdr package                               ##
+##                                                                       ##
+## James Liley and Chris Wallace, 2020                                   ##
+## Correspondence: JL, james.liley@igmm.ed.ac.uk                         ##
 ##                                                                       ##
 ###########################################################################
+#
 
 ###########################################################################
 ## Packages and scripts ###################################################
@@ -431,7 +435,7 @@ vlo=function(p,q,f0,f,indices=NULL,at=NULL,nt=5000, nv=1000, scale=c("p","z"), c
 ##' for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indices[i]],pch=16,col="blue")
 ##'
 ##' 
-vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000, nv=1000,scale=c("p","z"),closed=T) {
+vlx=function(p,q,pars,adj=1,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000, nv=1000,scale=c("p","z"),closed=T) {
   
   zp=-qnorm(p/2); zq=-qnorm(q/2)
   
@@ -460,7 +464,7 @@ vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000
   denom=function(zp,zq,pars) denom1(zp,zq,pars)/denom2(zp,zq,pars)
   adjx=function(zp,zq,pars) (pars[1]/(pars[1]+pars[3]))*pnorm(-zq) +
     (pars[3]/(pars[1]+pars[3]))*pnorm(-zq,sd=pars[6])
-  if (adj) {
+  if (adj==2) {
     raw_cfx=function(p,q) p*adjx(-qnorm(p/2),-qnorm(q/2),pars)/denom1(-qnorm(p/2),-qnorm(q/2),pars)
   } else {
     raw_cfx=function(p,q) p/denom(-qnorm(p/2),-qnorm(q/2),pars)
@@ -481,20 +485,20 @@ vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000
   yval2=seq(0,my,length.out=nv+1)[1:nv]; xval2=outer(rep(1,length(ccut)),yval2); pval2=2*pnorm(-yval2)
   xtest=seq(0,mx,length.out=nt); ptest=2*pnorm(-xtest)
   
-#  if (adj==1) {
-#    include=setdiff(1:length(p),fold)
-#    correct=cummin((1+ecdf(q[include][which(p[include]>0.5)])(pval2)*length(p[include]))/
-#        (1+ ecdf(q[include])(pval2)*length(p[include])))
-#    if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
-#  } else {
-#    correct=rep(1,length(pval2)) # adjustment factor for pc[i]
-#    correct_ccut=rep(1,length(ccut))
-#  }
-#  if (!is.null(indices)) ccut=ccut*correct_ccut
+  if (adj==1) {
+    include=setdiff(1:length(p),fold)
+    correct=cummin((1+ecdf(q[include][which(p[include]>0.5)])(pval2)*length(p[include]))/
+                     (1+ ecdf(q[include])(pval2)*length(p[include])))
+    if (!is.null(indices)) correct_ccut=approx(pval2,correct,q[indices],rule=2)$y #cummin((1+ecdf(pc[which(p>0.5)])(pc)*length(p))/(1+ rank(pc)))
+  } else {
+    correct=rep(1,length(pval2)) # adjustment factor for pc[i]
+    correct_ccut=rep(1,length(ccut))
+  }
+  if (!is.null(indices)) ccut=ccut*correct_ccut
   
   for (i in 1:length(yval2)) {
     cfx=cummin(raw_cfx(ptest,2*pnorm(-yval2[i])))
-    xval2[,i]=approx(cfx,xtest,ccut,rule=2,method="const",f=1)$y
+    xval2[,i]=approx(cfx*correct[i],xtest,ccut,rule=2,method="const",f=1)$y
   }
   
   
@@ -516,6 +520,13 @@ vlx=function(p,q,pars,adj=T,indices=NULL,at=NULL,fold=NULL,p_threshold=0,nt=5000
   
   
 }
+
+
+
+
+
+
+
 
 
 ##' Return co-ordinates of L-regions for cFDR method using local four-groups method. Automatically includes an estimate of Pr(H0|Q<q).

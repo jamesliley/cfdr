@@ -1,9 +1,9 @@
 Package: cfdr
 Title: Implements cFDR testing with overall FDR control
 Version: 1.0.0.0
-Authors@R: c(person("James", "Liley", email = "ajl88@medschl.cam.ac.uk", role = c("aut", "cre")), person("Chris","Wallace", email="cew54@cam.ac.uk",role="aut"))
+Authors@R: c(person("James", "Liley", email = "james.liley@igmm.ed.ac.uk", role = c("aut", "cre")), person("Chris","Wallace", email="cew54@cam.ac.uk",role="aut"))
 Description: Implements conditional false-discovery rate hypothesis testing, used to perform high-dimensional hypothesis tests. Requires a set of summary statistics in an experiment of interest, and 'levers' on a second set of summary statistics at the same variables for a second experiment. Enables frequentist hypothesis testing with overall strong control of false-discovery rate. Can use several estimators of the cFDR function cFDR(p,q)=Pr(P<p,Q<q|H0).
-Depends: R (>= 3.4.3)
+Depends: R (>= 3.3.3)
 License: Freely distributable
 Imports: MASS,
  mnormt,
