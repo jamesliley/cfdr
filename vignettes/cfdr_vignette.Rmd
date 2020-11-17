@@ -4,7 +4,7 @@ author: "James Liley"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{Vignette for package cfdr}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -14,6 +14,9 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+source('../R/functions.R')
+
 ```
 
 ## Vignette overview
@@ -31,7 +34,7 @@ In this vignette, we will firstly use the values $(p_{1},q_1),(p_{2},q_2),...,(p
 
 We simulate datasets which have $10000$ variables overall, of which $100$ are associated only with $Y_P$, $100$ with $Y_Q$, $100$ with both $Y_P$ and $Y_Q$ (make a difference to both), and $99700$ with neither $Y_P$ nor $Y_Q$. We simulate associations such that observed z-scores for these variables have a normal distribution with mean 0 and standard deviation 3 (as opposed to a standard deviation 1 for non-associated variables).
 
-```
+```{r  }
 set.seed(1)                                           # ensure reproducibility
 n=10000; n1p=100; n1pq=100; n1q=100                   # parameters
 zp=c(rnorm(n1p,sd=3), rnorm(n1q,sd=1),
@@ -43,26 +46,26 @@ p=2*pnorm(-abs(zp)); q=2*pnorm(-abs(zq))              # convert to p-values
 
 We also split the variables into three folds, which we will use later:
 
-```
+```{r  }
 fold_id=(1:n) %% 3
 ```
 
 We are not going to reject $H^P=0$ for variables with very large p-values against $H^P=0$, so to save time we consider a set of indices of candidate variables rather than all of them.
 
-```
+```{r  }
 candidate_indices=which(p<0.01 | q< 0.001)
 ```
 
 
 and designate a set of indices of variables we will use as examples:
 
-```
+```{r  }
 example_indices=example_indices=c(4262, 268,83,8203) 
 ```
 
 The FDR-controlling procedure requires an estimate of the distribution of $Q|H^p=0$ (effectiveness in Qatari performance given no effect on Peruvian performance). We suggest modelling this as a bivariate Gaussian fitted to the values $q_i$ for which the corresponding $p_i$ is $\geq 1/2$. Fitted parameters (maximum-likelihood estimates) can be fitted using the function ```fit.2g```. In this simulated example, we also keep track of the true distribution of $Q|H^p=0$ under which $P,Q$ were simulated. <!-- (the true distribution of $Q|H^p=0$ is $2\Phi(-|N(0,1)|)$ with weight $1- n_1^q /(n-n_1^p- n_1^{pq}$), and $2\Phi(-|N(0,2^2)|)$ with weight $n_1^q /(n-n_1^p- n_1^{pq}$) -->
 
-```
+```{r  }
 # True parameters
 true_q0_pars=c(1- n1q/(n-n1p-n1pq),2)
 
@@ -77,13 +80,13 @@ est_q0_pars=fit.2g(q[which(p>0.5)])$pars
 
 In order to control the overall FDR at $\alpha$, we construct 'L-curves' through the points $(p_i,q_i)$. L-curves are effectively contours of the cFDR estimator function. In order to control FDR, the shape of the L-curve through each point $(p_i,q_i)$ must be determined as if the specific point $(p_i,q_i)$ was not in the dataset. One way to do this is to leave out the individual point, compute the contours of the function, and then work out the contour which would go through that point. To do this, we use the function ```vl``` with the parameter ```mode``` set to 1. We only compute co-ordinates of L-curves at the candidate indices from above.
 
-```
+```{r  }
 lx=vl(p,q,indices=candidate_indices,mode=1); 
 ```
 
 To demonstrate what the curves look like, we show some examples:
 
-```
+```{r  }
 vx=vl(p,q,indices=example_indices,mode=1); 
 plot(p,q,cex=0.5,col="gray",xlim=c(0,0.001),ylim=c(0,1), main="Single point removed"); 
 for (i in 1:length(example_indices)) lines(vx$x[i,],vx$y); 
@@ -95,7 +98,7 @@ for (i in 1:length(example_indices)) points(p[example_indices[i]],q[example_indi
 
 We now integrate the estimated distribution of $P,Q|H^p=0$ over the computed L-regions from the step above, to get an analogue of p-values ```v_est``` (for variables with indices not in ```candidate_indices```, we set ```v_est=1```). We also integrate over the true and estimated distributions estimated above to indicate the similarity between the two, although obviously in practice the true distribution is not known.
 
-```
+```{r  }
 v_true=rep(1,n); v_est=v_true
 v_true[candidate_indices]=il(lx,pi0_null=true_q0_pars[1],sigma_null=true_q0_pars[2],distx="norm")
 v_est[candidate_indices]=il(lx,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
@@ -105,19 +108,19 @@ v_est[candidate_indices]=il(lx,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2]
 
 Finally, we run the Benjamini-Hochberg procedure on the values ```v_est```, to control the FDR at 0.1
 
-```
-hit=bh(v_est,alpha=0.1)
+```{r  }
+hit_est=bh(v_est,alpha=0.1)
 ```
 
 For comparison, we also evaluate the performance of the raw p-values:
 
-```
+```{r  }
 hit_p=bh(p,alpha=0.1)
 ```
 
 'True' associations are those with indices in $(1,100) \cup (201,300)$, so the proportions of false discoveries are
 
-```
+```{r  }
 # cFDR
 1- (length(intersect(hit_est,c(1:100,201:300)))/length(hit_est)) 
 
@@ -135,10 +138,10 @@ This can be alleviated by using an alternative method for control of FDR. We spl
 
 We compute L-curves using function ```vl``` with ```mode=2```:
 
-```
-fold1=which(fold_id==1) 
-fold2=which(fold_id==2) 
-fold3=which(fold_id==3)
+```{r  }
+fold1=which(fold_id==0) 
+fold2=which(fold_id==1) 
+fold3=which(fold_id==2)
 
 ind1=intersect(candidate_indices,fold1) 
 ind2=intersect(candidate_indices,fold2) 
@@ -146,14 +149,14 @@ ind3=intersect(candidate_indices,fold3)
 
 v1=vl(p,q,indices=ind1,mode=2,fold=fold1);  # parameter fold specifies indices to leave out 
 v2=vl(p,q,indices=ind2,mode=2,fold=fold2); 
-v2=vl(p,q,indices=ind2,mode=2,fold=fold3); 
+v3=vl(p,q,indices=ind3,mode=2,fold=fold3); 
 ```
 
 ### Integrate over L-curves
 
 We integrate over L-curves as before, to get ```v_fold```
 
-```
+```{r  }
 v_fold=rep(1,n)
 v_fold[ind1]=il(v1,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
 v_fold[ind2]=il(v2,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm")
@@ -164,6 +167,6 @@ v_fold[ind3]=il(v3,pi0_null=est_q0_pars[1],sigma_null=est_q0_pars[2],distx="norm
 
 Using the usual rejection procedure, we then determine which hypotheses to reject:
 
-```
+```{r  }
 hit_fold=bh(v_fold,0.1)
 ```
